@@ -15,8 +15,8 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 try:
     from config.settings import config
     from utils.logging_config import logger, bot_logger
-    from utils.error_handling.exceptions import HelpError
-    from utils.error_handling.handler import ErrorHandler, get_error_handler
+    # from utils.error_handling.exceptions import HelpError
+    # from utils.error_handling.handler import ErrorHandler, get_error_handler
     from utils.cache_manager import bot_cache
     from commands.base_command import BaseCommand
     from models.user import User
@@ -150,13 +150,10 @@ class HelpCommand(BaseCommand):
     
     def _load_help_items(self) -> List[Dict[str, str]]:
         """
-        도움말 항목 로드 (캐시 우선, 시트 후순위)
-        
-        Returns:
-            List[Dict]: 도움말 항목들
+        도움말 항목 로드 (수정된 버전)
         """
-        # 캐시에서 먼저 조회
-        cached_items = bot_cache.get_help_items()
+        # 직접 캐시에서 조회 (fetch_func 없이)
+        cached_items = bot_cache.get("help_items")
         if cached_items:
             logger.debug("캐시에서 도움말 항목 로드")
             return cached_items
@@ -166,8 +163,8 @@ class HelpCommand(BaseCommand):
             if self.sheets_manager:
                 items = self.sheets_manager.get_help_items()
                 if items:
-                    # 캐시에 저장 (설정된 TTL 사용)
-                    bot_cache.cache_help_items(items)
+                    # 캐시에 저장 (1시간)
+                    bot_cache.set("help_items", items, 3600)
                     logger.debug(f"시트에서 도움말 항목 로드: {len(items)}개")
                     return items
         except Exception as e:
