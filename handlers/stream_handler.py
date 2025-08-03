@@ -60,6 +60,95 @@ except ImportError:
     # SheetsManager fallback
     class SheetsManager:
         pass
+    
+    # text_processing 함수들 fallback
+    def extract_text_from_html(html_content: str) -> str:
+        """HTML 태그 제거하여 텍스트 추출 (fallback)"""
+        if not html_content:
+            return ""
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_content, 'html.parser')
+            return soup.get_text(separator=' ', strip=True)
+        except:
+            # BeautifulSoup도 실패하면 간단한 태그 제거
+            import re
+            return re.sub(r'<[^>]+>', '', html_content)
+    
+    def has_command_format(text: str) -> bool:
+        """텍스트에 명령어 형식이 있는지 확인 (fallback)"""
+        if not text:
+            return False
+        return '[' in text and ']' in text
+    
+    def detect_korean_particle(word: str, particle_type: str = 'object') -> str:
+        """한국어 조사 감지 (fallback)"""
+        return '을' if particle_type == 'object' else '이'
+    
+    def format_with_particle(word: str, particle_type: str) -> str:
+        """조사와 함께 포맷팅 (fallback)"""
+        particle = detect_korean_particle(word, particle_type)
+        return f"{word}{particle}"
+    
+    # parse_command_from_text fallback
+    def parse_command_from_text(text: str) -> List[str]:
+        """텍스트에서 명령어 키워드 추출 (fallback)"""
+        if not text:
+            return []
+        
+        import re
+        # 빠른 패턴 매칭
+        match = re.search(r'\[([^\]]+)\]', text)
+        if not match:
+            return []
+        
+        keywords_str = match.group(1)
+        if not keywords_str:
+            return []
+        
+        # 키워드 분할
+        keywords = []
+        for keyword in keywords_str.split('/'):
+            clean_keyword = keyword.strip()
+            if clean_keyword:
+                keywords.append(clean_keyword)
+        
+        return keywords
+    
+    # validate_command_format fallback
+    def validate_command_format(text: str) -> Tuple[bool, str]:
+        """명령어 형식 유효성 검사 (fallback)"""
+        if not text:
+            return False, "텍스트가 비어있습니다."
+        
+        # 기본 형식 확인
+        if '[' not in text or ']' not in text:
+            return False, "명령어는 [명령어] 형식으로 입력해야 합니다."
+        
+        start_pos = text.find('[')
+        end_pos = text.find(']')
+        
+        if start_pos >= end_pos:
+            return False, "명령어 형식이 올바르지 않습니다. [명령어] 순서를 확인해주세요."
+        
+        # 키워드 추출 및 확인
+        keywords = parse_command_from_text(text)
+        if not keywords:
+            return False, "명령어가 비어있습니다."
+        
+        return True, "올바른 명령어 형식입니다."
+    
+    # LogContext fallback
+    class LogContext:
+        def __init__(self, operation: str, **kwargs):
+            self.operation = operation
+            self.kwargs = kwargs
+        
+        def __enter__(self):
+            return self
+        
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
 
 
 def validate_stream_dependencies() -> Tuple[bool, List[str]]:
@@ -464,6 +553,8 @@ class BotStreamHandler(mastodon.StreamListener):
                         return False
                     def get_user_message(self):
                         return self.message
+                    def get_log_message(self):
+                        return f"오류: {self.message}"
                 
                 return DummyResult("명령어 실행 중 오류가 발생했습니다.")
     
@@ -835,22 +926,27 @@ class BotStreamHandler(mastodon.StreamListener):
     def start_streaming(self, max_retries: int = 3) -> bool:
         """스트리밍 시작"""
         try:
-            logger.info("스트리밍 시작")
-            # 스트리밍 시작 로직 (필요시 구현)
-            logger.info("스트리밍 시작 완료")
+            logger.info("🚀 마스토돈 스트리밍 시작...")
+            
+            # 실제 마스토돈 스트리밍 시작 (스트림 객체 저장)
+            self._stream = self.api.stream_user(self)
+            
+            logger.info("✅ 스트리밍 시작 완료")
             return True
         except Exception as e:
-            logger.error(f"스트리밍 시작 중 오류: {e}")
+            logger.error(f"❌ 스트리밍 시작 중 오류: {e}")
             return False
     
     def stop_streaming(self) -> None:
         """스트리밍 중지"""
         try:
-            logger.info("스트리밍 중지 요청")
-            # 스트리밍 중지 로직 (필요시 구현)
-            logger.info("스트리밍 중지 완료")
+            logger.info("🛑 스트리밍 중지 요청")
+            # 스트리밍 중지 (close 메서드 호출)
+            if hasattr(self, '_stream') and self._stream:
+                self._stream.close()
+            logger.info("✅ 스트리밍 중지 완료")
         except Exception as e:
-            logger.error(f"스트리밍 중지 중 오류: {e}")
+            logger.error(f"❌ 스트리밍 중지 중 오류: {e}")
     
     def reset_statistics(self) -> None:
         """통계 초기화"""

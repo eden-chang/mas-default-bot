@@ -590,6 +590,8 @@ class CommandRouter:
                     return False
                 def get_user_message(self):
                     return self.message
+                def get_log_message(self):
+                    return f"오류: {self.message}"
             return DummyResult(error_message)
     
     def _create_not_found_result(self, user_id: str, keyword: str) -> CommandResult:

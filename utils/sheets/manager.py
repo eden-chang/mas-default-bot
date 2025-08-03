@@ -99,15 +99,26 @@ class SheetsManager:
         return self.operations.user_exists(user_id, config.get_worksheet_name('ROSTER'))
     
     def log_action_real_time(self, user_name: str, command: str, message: str, success: bool = True) -> bool:
-        """실시간 로그 기록"""
+        """로컬 로그 기록 (Google Sheets API 제한 고려)"""
         try:
-            return self.operations.log_action(
-                config.get_worksheet_name('LOG'),
-                user_name, command, message, success
-            )
+            from datetime import datetime
+            import pytz
+            
+            now = datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M:%S')
+            status = "성공" if success else "실패"
+            
+            # 메시지 길이 제한
+            if len(message) > 1000:
+                message = message[:997] + "..."
+            
+            # 로컬 로그만 기록 (Google Sheets API 호출 없음)
+            log_entry = f"[{now}] {user_name} | {command} | {message} | {status}"
+            logger.info(log_entry)
+            
+            return True
+            
         except Exception as e:
-            # 로그 워크시트가 없거나 접근할 수 없는 경우
-            logger.warning(f"로그 기록 실패 (워크시트 접근 불가): {e}")
+            logger.warning(f"로컬 로그 기록 실패: {e}")
             return True  # 로그 실패해도 봇 동작에는 영향 없음
     
     def get_custom_commands_cached(self) -> Dict[str, List[str]]:
@@ -345,17 +356,12 @@ class SheetsManager:
                 'worksheets_found': []
             }
             
-            # 기본 워크시트 목록 확인
+            # 필수 워크시트 목록 확인 (로그는 로컬 저장으로 변경)
             expected_worksheets = [
                 config.get_worksheet_name('ROSTER'),
                 config.get_worksheet_name('FORTUNE'),
                 config.get_worksheet_name('HELP'),
                 config.get_worksheet_name('CUSTOM')
-            ]
-            
-            # 선택사항 워크시트 (없어도 오류 아님)
-            optional_worksheets = [
-                config.get_worksheet_name('LOG')
             ]
             
             # 필수 워크시트 확인
@@ -371,18 +377,7 @@ class SheetsManager:
                     result['errors'].append(f"워크시트 '{worksheet_name}' 접근 실패: {str(e)}")
                     result['valid'] = False
             
-            # 선택사항 워크시트 확인
-            for worksheet_name in optional_worksheets:
-                try:
-                    # 워크시트 읽기 시도
-                    data = self.read_worksheet_real_time(worksheet_name)
-                    if data is not None:
-                        result['worksheets_found'].append(worksheet_name)
-                    else:
-                        result['warnings'].append(f"선택사항 워크시트 '{worksheet_name}'이 비어있습니다")
-                except Exception as e:
-                    result['warnings'].append(f"선택사항 워크시트 '{worksheet_name}' 접근 실패: {str(e)}")
-                    # 선택사항이므로 오류로 처리하지 않음
+
             
             # 최소 필수 워크시트 확인
             if len(result['worksheets_found']) < 2:

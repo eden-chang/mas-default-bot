@@ -127,13 +127,12 @@ class Config:
     DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     ENABLE_CONSOLE_LOG: bool = os.getenv('ENABLE_CONSOLE_LOG', 'True').lower() == 'true'
     
-    # 워크시트 이름 상수
+    # 워크시트 이름 상수 (로그는 로컬 저장으로 변경)
     WORKSHEET_NAMES = {
         'ROSTER': '명단',
         'CUSTOM': '커스텀',
         'HELP': '도움말',
         'FORTUNE': '운세',
-        'LOG': '로그',
     }
     
     # 시스템 키워드 (공백 있는/없는 버전 모두 지원)
